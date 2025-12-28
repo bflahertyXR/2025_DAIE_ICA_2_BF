@@ -2,6 +2,8 @@
 title: "2025_DAIE_ICA_2_BF"
 format: dashboard
 server: shiny
+page-layout: full
+theme: flatly
 ---
 
 
@@ -50,12 +52,20 @@ dbListTables(conn)
 #| message: true
 #| warning: true
  
-tabPanel("Data View", h3("View Database Tables"), selectInput(inputId = "table_select", label = "Select a Table to View:", choices = c("Clients", "Productions", "CrewMembers", "Assets"), selected = "Clients"), DTOutput("table_output"))
+tabsetPanel(
+  tabPanel("Data View",
+  selectInput("table_select", "Select a Table to View:",
+  choices = c("Clients", "Productions", "CrewMembers", "Assets")),
+  DTOutput("table_output")))
 
 
 ```
 
 ```{r}
+#| label: Server
+#| echo: false
+#| message: true
+#| warning: true
 
 output$table_output <- renderDT({
   req(input$table_select)

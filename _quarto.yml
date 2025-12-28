@@ -1,5 +1,5 @@
 project:
-  type: dashboard
+  type: default
 
 website:
   title: "2025_DAIE_ICA_2_BF"
@@ -8,9 +8,8 @@ website:
       - href: index.qmd
         text: Home
 
-format:
-  dashboard: 
-  theme: flatly
+format: dashboard
+theme: flatly
 
-server: shiny
+
 
