@@ -43,3 +43,26 @@ conn <- dbConnect(RSQLite::SQLite(), "virtual_production.db")
 dbListTables(conn)
 
 ```
+
+```{r}
+#| label: Data View UI
+#| echo: false
+#| message: true
+#| warning: true
+ 
+tabPanel("Data View", h3("View Database Tables"), selectInput(inputId = "table_select", label = "Select a Table to View:", choices = c("Clients", "Productions", "CrewMembers", "Assets"), selected = "Clients"), DTOutput("table_output"))
+
+
+```
+
+```{r}
+
+output$table_output <- renderDT({
+  req(input$table_select)
+  df <- dbReadTable(conn, input$table_select)
+  datatable(df, options = list(pageLength = 10, scrollX = TRUE))
+  })
+
+```
+
+

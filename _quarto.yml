@@ -1,5 +1,5 @@
 project:
-  type: website
+  type: dashboard
 
 website:
   title: "2025_DAIE_ICA_2_BF"
@@ -7,15 +7,10 @@ website:
     left:
       - href: index.qmd
         text: Home
-      - about.qmd
 
 format:
-  html:
-    theme:
-      - cosmo
-      - brand
-    css: styles.css
-    toc: true
+  dashboard: 
+  theme: flatly
 
-editor: visual
+server: shiny
 
