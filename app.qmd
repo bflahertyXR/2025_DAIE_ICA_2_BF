@@ -1,0 +1,80 @@
+---
+title: "Interactive Dashboard"
+format: html
+server: shiny
+---
+
+```{r}
+#| label: Install and Load Libraries
+#| message: true
+#| warning: true
+#| include: false
+
+if(!require("shiny"))
+  install.packages("shiny")
+  library(shiny)
+
+if(!require("DT"))
+  install.packages("DT")
+  library(DT)
+
+if(!require("DBI"))
+  install.packages("DBI")
+  library(DBI)
+
+if(!require("RSQLite"))
+  install.packages("RSQLite")
+  library(RSQLite)
+
+if(!require("ggplot2"))
+  install.packages("ggplot2")
+  library(ggplot2)
+
+if(!require("plotly"))
+  install.packages("plotly")
+  library(plotly)
+
+if(!require("dplyr"))
+  install.packages("dplyr")
+  library(dplyr)
+
+if(!require("dplyr"))
+  install.packages("bslib")
+  library(bslib)
+
+conn <- dbConnect(RSQLite::SQLite(), "virtual_production.db")
+dbListTables(conn)
+
+ui <- fluidPage(
+  theme = bs_theme(
+    version = 5,
+    bootswatch = "flatly", 
+    base_font = font_google("Roboto"), 
+    heading_font = "Montserrat", 
+    primary="#007bff"),
+  titlePanel("Virtual Production Dashboard"),
+  tabsetPanel(
+    tabPanel("Data View",
+      h3("Explore Database Tables"),
+      selectInput(
+          "table_select", 
+          "Select a Table to View:",
+          choices = c("Clients", "Productions", "CrewMembers", "Assets"),
+          selected = "Clients"),
+      DTOutput("table_output")
+      )))
+
+server <- function(input, output, session){
+  
+  output$table_output <- renderDT({
+    req(input$table_select)
+    df <- dbReadTable(conn, input$table_select)
+    datatable(df, options = list(pageLength = 10, scrollX = TRUE))
+  })
+}
+
+shinyApp(ui, server)
+
+renv::snapshot()
+
+```

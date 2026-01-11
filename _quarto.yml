@@ -1,15 +1,18 @@
-project:
-  type: default
-
+project: 
+  type: website
+  
 website:
   title: "2025_DAIE_ICA_2_BF"
   navbar:
     left:
       - href: index.qmd
-        text: Home
+        text: "Home"
+      - href: app.qmd
+        text: "Interactive Dashbaord"
 
-format: dashboard
-theme: flatly
+format: 
+  html:
+    theme: flatly
 
 
 
