@@ -6,9 +6,9 @@ server: shiny
 
 ```{r}
 #| label: Install and Load Libraries
+#| echo: false
 #| message: true
 #| warning: true
-#| include: false
 
 if(!require("shiny"))
   install.packages("shiny")
@@ -44,6 +44,7 @@ if(!require("dplyr"))
 
 conn <- dbConnect(RSQLite::SQLite(), "virtual_production.db")
 dbListTables(conn)
+crew_list <- dbGetQuery(conn, "SELECT DISTINCT Name FROM CrewMembers")
 
 ui <- fluidPage(
   theme = bs_theme(
@@ -61,8 +62,18 @@ ui <- fluidPage(
           "Select a Table to View:",
           choices = c("Clients", "Productions", "CrewMembers", "Assets"),
           selected = "Clients"),
-      DTOutput("table_output")
-      )))
+      DTOutput("table_output"))),
+      tabsetPanel(tabPanel("Plot View", 
+      selectInput(
+        "crew_select", 
+        "Select Crew Member:",
+        choices = crew_list$Name),
+      dateRangeInput(
+        "date_range",
+        "Completion Date Range:",
+        start="2023-01-01", end = Sys.Date()),
+      plotlyOutput("crew_plot"),
+      hr())))
 
 server <- function(input, output, session){
   
@@ -71,6 +82,22 @@ server <- function(input, output, session){
     df <- dbReadTable(conn, input$table_select)
     datatable(df, options = list(pageLength = 10, scrollX = TRUE))
   })
+  
+
+
+output$crew_plot <- renderPlotly({
+  req(input$crew_select, input$date_range)
+  query <- sprintf(
+    "SELECT Productions.Title, Productions.EndDate, Productions.Budget FROM ProductionCrew.ProductionID JOIN CrewMembers Crew ON ProductionCrew.CrewID = Crew.CrewID Where Crew.Name = '%s' AND DATE(Productions.EndDate) BETWEEN '%s' AND '%s' ", input$crew_select, input$date_range[1], input$date_range[2])
+  df <-dbGetQuery(conn, query)
+  ggplotly(
+    ggplot(df, aes(x = EndDate, y = Budget, text = Title)) +
+      geom_point(color = "#007bff", size = 3) + 
+      labs(title = paste("Productions for", input$crew_select), 
+           x = "Completion Date", y = "Budget") +
+      theme_minimal()
+  )
+})
 }
 
 shinyApp(ui, server)
