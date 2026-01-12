@@ -44,7 +44,12 @@ if(!require("dplyr"))
 
 conn <- dbConnect(RSQLite::SQLite(), "virtual_production.db")
 dbListTables(conn)
+
 crew_list <- dbGetQuery(conn, "SELECT DISTINCT Name FROM CrewMembers")
+
+budget_info <- dbGetQuery(conn, "SELECT MIN(Budget) AS min_budget, MAX(Budget) AS max_budget FROM Productions")
+
+date_info <- dbGetQuery(conn, "SELECT MIN(DATE(EndDate) AS min_date, MAX(DATE(EndDate) AS max_date")
 
 ui <- fluidPage(
   theme = bs_theme(
@@ -53,51 +58,138 @@ ui <- fluidPage(
     base_font = font_google("Roboto"), 
     heading_font = "Montserrat", 
     primary="#007bff"),
+  
   titlePanel("Virtual Production Dashboard"),
+  
   tabsetPanel(
     tabPanel("Data View",
-      h3("Explore Database Tables"),
+      icon = icon("Table"),
+      h4("Explore Database Tables"),
       selectInput(
-          "table_select", 
-          "Select a Table to View:",
+          inputId = "table_select", 
+          label = "Select a Table to View:",
           choices = c("Clients", "Productions", "CrewMembers", "Assets"),
-          selected = "Clients"),
-      DTOutput("table_output"))),
-      tabsetPanel(tabPanel("Plot View", 
+          selected = "Clients"
+          ),
+      DTOutput("table_output")
+      ),
+  
+    tabPanel("Plot View",
+             icon = icon("chart-line"),
+      h4("Interactive Visualisations"),
       selectInput(
-        "crew_select", 
-        "Select Crew Member:",
-        choices = crew_list$Name),
+        inputId = "crew_select", 
+        label = "Select Crew Member:",
+        choices = crew_list$Name,
+        selected = crew_list$Name[1]
+        ),
+      
       dateRangeInput(
-        "date_range",
-        "Completion Date Range:",
-        start="2023-01-01", end = Sys.Date()),
-      plotlyOutput("crew_plot"),
-      hr())))
+        inputId = "date_range",
+        label = "Completion Date Range:",
+        start="2023-01-01", end = Sys.Date()
+        ),
+      
+      plotlyOutput("crew_plot", height="400px"),
+      
+      hr(),
+    
+      h4("Production Budget & Status"),
+        sliderInput(
+        inputId = "budget_range",
+        label = "Budget Range:",
+        min = 0, max = 1000000,
+        value = c(0, 1000000),
+        
+        checkboxGroupInput(
+          inputId = "status_filter", 
+          label = "Production Status:",
+          choices = c("Completed", "In-Progress"),
+          selected = c("Completed", "In-Progress"),
+          inline = TRUE
+          ),
+        
+      plotlyOutput("budget_plot", height ="400px")
+        )
+      )
+    )
+  )
 
 server <- function(input, output, session){
   
   output$table_output <- renderDT({
     req(input$table_select)
     df <- dbReadTable(conn, input$table_select)
+    
     datatable(df, options = list(pageLength = 10, scrollX = TRUE))
   })
   
 
-
+#---Plot 1 Crew Members and Productions ---
+  
 output$crew_plot <- renderPlotly({
+  
   req(input$crew_select, input$date_range)
+  
   query <- sprintf(
-    "SELECT Productions.Title, Productions.EndDate, Productions.Budget FROM ProductionCrew.ProductionID JOIN CrewMembers Crew ON ProductionCrew.CrewID = Crew.CrewID Where Crew.Name = '%s' AND DATE(Productions.EndDate) BETWEEN '%s' AND '%s' ", input$crew_select, input$date_range[1], input$date_range[2])
+    "SELECT 
+    Productions.Title, 
+    Productions.EndDate, 
+    Productions.Budget 
+    FROM ProductionCrew.ProductionID 
+    JOIN CrewMembers Crew ON ProductionCrew.CrewID = Crew.CrewID 
+    Where Crew.Name = '%s' AND DATE(Productions.EndDate) BETWEEN '%s' AND '%s' 
+    ORDER BY Productions.EndDate ASC", 
+    input$crew_select, 
+    input$date_range[1], 
+    input$date_range[2])
+  
   df <-dbGetQuery(conn, query)
-  ggplotly(
-    ggplot(df, aes(x = EndDate, y = Budget, text = Title)) +
+  
+  p <- ggplot(df, aes(x = EndDate, y = Budget, text = Title)) +
       geom_point(color = "#007bff", size = 3) + 
       labs(title = paste("Productions for", input$crew_select), 
            x = "Completion Date", y = "Budget") +
       theme_minimal()
-  )
+  
+  ggplotly(p, tooltip = c("text", "x", "y"))
+  
 })
+
+#---Plot 2 Budget and Status---
+  
+output$budget_plot <- renderPlotly({
+  req(input$budget_range, input$status_filter)
+  
+  query <- sprintf(
+    "SELECT 
+    Productions.Title, 
+    Productions.Budget, 
+    Productions.Status, 
+    COUNT(ProductionCrew.CrewID) AS CrewSize 
+    FROM Productions 
+    LEFT JOIN ProductionsCrew ON Productions.ProductionID = ProductionCrew.ProductionID 
+    WHERE Productions.Budget BETWEEN %d AND %d AND Productions.Status IN (%s) 
+    GROUP BY Productions.Title, Productions.Budget, Productions.Status
+    ORDER BY Productions.Budget ASC",
+    
+  input$budget_range[1], 
+  input$budget_range[2], 
+  paste(input$status_filter, collapse = "','"))
+  
+  df <-dbGetQuery(conn, query)
+  
+
+    p <- ggplot(df, aes(x = CrewSize, y = Budget, colour = Status, text = Title)) +
+      geom_point(size = 3, alpha = 0.7) + 
+      labs(title = "Budget vs Crew Size by Status",
+           x = "Crew Size", y = "Budget") +
+      theme_minimal()
+    
+  ggplotly(p, tooltip = c("text", "x", "y"))
+  
+})
+
 }
 
 shinyApp(ui, server)
