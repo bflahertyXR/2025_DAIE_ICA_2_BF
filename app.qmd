@@ -215,13 +215,11 @@ output$budget_plot <- renderPlotly({
     
   ggplotly(p, tooltip = c("text", "x", "y"))
   
-})
-
-}
+})}
 
 shinyApp(ui, server)
 
-renv::status(
-  
-)
+renv::status()
+
+dbDisconnect(conn)
 ```
