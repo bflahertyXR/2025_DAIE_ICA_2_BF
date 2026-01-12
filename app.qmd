@@ -63,6 +63,7 @@ ui <- fluidPage(
   
   tabsetPanel(
     tabPanel("Data View",
+             icon = icon("table"),
       h4("Explore Database Tables"),
       selectInput(
           inputId = "table_select", 
@@ -73,9 +74,14 @@ ui <- fluidPage(
       DTOutput("table_output")
       ),
   
-    tabPanel("Plot View",
+    tabPanel("Plot View 1",
              icon = icon("chart-line"),
       h4("Interactive Visualisations"),
+      
+      sidebarLayout(
+        sidebarPanel(
+          width = 3,
+          style = "padding:20px; border-radius:10px;",
       selectInput(
         inputId = "crew_select", 
         label = "Select Crew Member:",
@@ -87,19 +93,30 @@ ui <- fluidPage(
         inputId = "date_range",
         label = "Completion Date Range:",
         start="2023-01-01", end = Sys.Date()
+        )
         ),
       
-      plotlyOutput("crew_plot", height="400px"),
+      mainPanel(
+        width = 9,
+        plotlyOutput("crew_plot", height="400px"),
+      )
+    )
+),
       
-      hr(),
-    
+     tabPanel("Plot View 2",
+             icon = icon("chart-line"),
       h4("Production Budget & Status"),
+      
+      sidebarLayout(
+        sidebarPanel(
+          width = 3,
+          style = "padding:20px; border-radius:10px;",
         sliderInput(
-        inputId = "budget_range",
-        label = "Budget Range:",
-        min = 0, max = 1000000,
-        value = c(0, 1000000),
-        step = 10000,
+          inputId = "budget_range",
+          label = "Budget Range:",
+          min = 0, max = 1000000,
+          value = c(0, 1000000),
+          step = 10000,
         ),
       
         checkboxGroupInput(
@@ -108,12 +125,17 @@ ui <- fluidPage(
           choices = c("Completed", "In-Progress"),
           selected = c("Completed", "In-Progress"),
           inline = TRUE
-          ),
+          )
+        ),
         
-      plotlyOutput("budget_plot", height ="400px")
+        mainPanel(
+          width = 9,
+          plotlyOutput("budget_plot", height ="500px")
+          )
         )
-      )
-    )
+     )
+  )
+)
 
 server <- function(input, output, session){
   
@@ -133,18 +155,21 @@ output$crew_plot <- renderPlotly({
   
   query <- sprintf(
     "SELECT 
-    Productions.Title, 
-    Productions.EndDate, 
-    Productions.Budget 
-    FROM ProductionCrew.ProductionID 
-    JOIN CrewMembers Crew ON ProductionCrew.CrewID = Crew.CrewID 
-    Where Crew.Name = '%s' AND DATE(Productions.EndDate) BETWEEN '%s' AND '%s' 
-    ORDER BY Productions.EndDate ASC", 
+    p.Title, 
+    p.EndDate, 
+    p.Budget
+    FROM Productions p
+    JOIN ProductionCrew pc ON p.ProductionID = pc.ProductionID
+    JOIN CrewMembers c ON pc.CrewID = c.CrewID
+    WHERE c.Name = '%s'
+    ORDER BY p.EndDate ASC", 
+    
     input$crew_select, 
     input$date_range[1], 
     input$date_range[2])
   
   df <-dbGetQuery(conn, query)
+ 
   
   p <- ggplot(df, aes(x = EndDate, y = Budget, text = Title)) +
       geom_point(color = "#007bff", size = 3) + 
@@ -163,21 +188,23 @@ output$budget_plot <- renderPlotly({
   
   query <- sprintf(
     "SELECT 
-    Productions.Title, 
-    Productions.Budget, 
-    Productions.Status, 
-    COUNT(ProductionCrew.CrewID) AS CrewSize 
-    FROM Productions 
-    LEFT JOIN ProductionCrew ON Productions.ProductionID = ProductionCrew.ProductionID 
-    WHERE Productions.Budget BETWEEN %d AND %d AND Productions.Status IN (%s) 
-    GROUP BY Productions.Title, Productions.Budget, Productions.Status
-    ORDER BY Productions.Budget ASC",
+    p.Title, 
+    p.Budget, 
+    p.Status, 
+    COUNT(pc.CrewID) AS CrewSize 
+    FROM Productions p
+    LEFT JOIN ProductionCrew pc ON p.ProductionID = pc.ProductionID 
+    WHERE p.Budget BETWEEN 0 AND 999999999 AND p.Status IN ('Completed', 'In Progress')
+    GROUP BY p.Title, p.Budget, p.Status
+    ORDER BY p.Budget ASC",
     
   input$budget_range[1], 
   input$budget_range[2], 
   paste(input$status_filter, collapse = "','"))
   
+  print(query)
   df <-dbGetQuery(conn, query)
+  print(head(df))
   
 
     p <- ggplot(df, aes(x = CrewSize, y = Budget, colour = Status, text = Title)) +
