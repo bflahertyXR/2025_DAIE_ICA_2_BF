@@ -49,7 +49,7 @@ crew_list <- dbGetQuery(conn, "SELECT DISTINCT Name FROM CrewMembers")
 
 budget_info <- dbGetQuery(conn, "SELECT MIN(Budget) AS min_budget, MAX(Budget) AS max_budget FROM Productions")
 
-date_info <- dbGetQuery(conn, "SELECT MIN(DATE(EndDate) AS min_date, MAX(DATE(EndDate) AS max_date")
+date_info <- dbGetQuery(conn, "SELECT MIN(DATE(EndDate)) AS min_date, MAX(DATE(EndDate)) AS max_date FROM Productions")
 
 ui <- fluidPage(
   theme = bs_theme(
@@ -63,7 +63,6 @@ ui <- fluidPage(
   
   tabsetPanel(
     tabPanel("Data View",
-      icon = icon("Table"),
       h4("Explore Database Tables"),
       selectInput(
           inputId = "table_select", 
@@ -100,7 +99,9 @@ ui <- fluidPage(
         label = "Budget Range:",
         min = 0, max = 1000000,
         value = c(0, 1000000),
-        
+        step = 10000,
+        ),
+      
         checkboxGroupInput(
           inputId = "status_filter", 
           label = "Production Status:",
@@ -113,7 +114,6 @@ ui <- fluidPage(
         )
       )
     )
-  )
 
 server <- function(input, output, session){
   
@@ -168,7 +168,7 @@ output$budget_plot <- renderPlotly({
     Productions.Status, 
     COUNT(ProductionCrew.CrewID) AS CrewSize 
     FROM Productions 
-    LEFT JOIN ProductionsCrew ON Productions.ProductionID = ProductionCrew.ProductionID 
+    LEFT JOIN ProductionCrew ON Productions.ProductionID = ProductionCrew.ProductionID 
     WHERE Productions.Budget BETWEEN %d AND %d AND Productions.Status IN (%s) 
     GROUP BY Productions.Title, Productions.Budget, Productions.Status
     ORDER BY Productions.Budget ASC",
