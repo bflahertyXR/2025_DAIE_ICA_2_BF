@@ -1,8 +1,9 @@
 ---
 title: "Virtual Production Dashboard"
-format: 
-  dashboard:
-    orientation: columns
+format: dashboard
 ---
 
+# Welcome
+
+This Quarto website displays part C of my individual project for **Data Analytics for Immersive Environments** for Brendan Flaherty - D00285874 and integrates a Shiny app that runs locally through R Studio. The Shiny app can be found at app.qmd.
 

@@ -10,6 +10,8 @@ server: shiny
 #| message: true
 #| warning: true
 
+# Install packages needed and loads libraries
+
 if(!require("shiny"))
   install.packages("shiny")
   library(shiny)
@@ -42,15 +44,19 @@ if(!require("dplyr"))
   install.packages("bslib")
   library(bslib)
 
+# Connect to database
 conn <- dbConnect(RSQLite::SQLite(), "virtual_production.db")
-dbListTables(conn)
 
+# Gets a list of all crew members names
 crew_list <- dbGetQuery(conn, "SELECT DISTINCT Name FROM CrewMembers")
 
+# Gets the min and max budget values
 budget_info <- dbGetQuery(conn, "SELECT MIN(Budget) AS min_budget, MAX(Budget) AS max_budget FROM Productions")
 
+# Gets the earliest and latest dates
 date_info <- dbGetQuery(conn, "SELECT MIN(DATE(EndDate)) AS min_date, MAX(DATE(EndDate)) AS max_date FROM Productions")
 
+# Creates and defines the aspects of the UI & # Outlines Bootstrap theme and customises
 ui <- fluidPage(
   theme = bs_theme(
     version = 5,
@@ -59,29 +65,40 @@ ui <- fluidPage(
     heading_font = "Montserrat", 
     primary="#007bff"),
   
+  # Main title
   titlePanel("Virtual Production Dashboard"),
   
+  # Creates tabs on the pages, outlines amount of tabs, and inputs for each tab
   tabsetPanel(
+    # Data View tab and custom inputs
     tabPanel("Data View",
              icon = icon("table"),
       h4("Explore Database Tables"),
+      
+    # Dropdown menu with selection
       selectInput(
           inputId = "table_select", 
           label = "Select a Table to View:",
           choices = c("Clients", "Productions", "CrewMembers", "Assets"),
           selected = "Clients"
           ),
+    
+    # Output to table
       DTOutput("table_output")
       ),
   
+    # Plot View tab and custom inputs
     tabPanel("Plot View 1",
              icon = icon("chart-line"),
       h4("Interactive Visualisations"),
       
+    # Sidebar layout and style for user controls
       sidebarLayout(
         sidebarPanel(
           width = 3,
           style = "padding:20px; border-radius:10px;",
+      
+    # Dropdown menu with selections
       selectInput(
         inputId = "crew_select", 
         label = "Select Crew Member:",
@@ -89,6 +106,7 @@ ui <- fluidPage(
         selected = crew_list$Name[1]
         ),
       
+    # Date Range Picker
       dateRangeInput(
         inputId = "date_range",
         label = "Completion Date Range:",
@@ -96,21 +114,25 @@ ui <- fluidPage(
         )
         ),
       
+    # Output to plot in main panel section
       mainPanel(
         width = 9,
         plotlyOutput("crew_plot", height="400px"),
       )
     )
 ),
-      
+    # Plot View tab and custom inputs 
      tabPanel("Plot View 2",
              icon = icon("chart-line"),
       h4("Production Budget & Status"),
       
+    # Sidebar layout and style for user controls
       sidebarLayout(
         sidebarPanel(
           width = 3,
           style = "padding:20px; border-radius:10px;",
+        
+      # Slider input for Budget Range
         sliderInput(
           inputId = "budget_range",
           label = "Budget Range:",
@@ -119,6 +141,7 @@ ui <- fluidPage(
           step = 10000,
         ),
       
+      # Checkboxes for Status filter
         checkboxGroupInput(
           inputId = "status_filter", 
           label = "Production Status:",
@@ -128,6 +151,7 @@ ui <- fluidPage(
           )
         ),
         
+     # Output to plot in main panel section
         mainPanel(
           width = 9,
           plotlyOutput("budget_plot", height ="500px")
@@ -137,12 +161,13 @@ ui <- fluidPage(
   )
 )
 
+# Interactive outputs and inputs changes
 server <- function(input, output, session){
   
+# Creates interactive table 
   output$table_output <- renderDT({
     req(input$table_select)
     df <- dbReadTable(conn, input$table_select)
-    
     datatable(df, options = list(pageLength = 10, scrollX = TRUE))
   })
   
@@ -150,33 +175,35 @@ server <- function(input, output, session){
 #---Plot 1 Crew Members and Productions ---
   
 output$crew_plot <- renderPlotly({
-  
   req(input$crew_select, input$date_range)
   
+  #Build SQL query - this joins 3 tables and sprintf inserts into the query string
   query <- sprintf(
     "SELECT 
-    p.Title, 
-    p.EndDate, 
-    p.Budget
-    FROM Productions p
-    JOIN ProductionCrew pc ON p.ProductionID = pc.ProductionID
-    JOIN CrewMembers c ON pc.CrewID = c.CrewID
-    WHERE c.Name = '%s'
-    ORDER BY p.EndDate ASC", 
+      p.Title, 
+      p.EndDate, 
+      p.Budget
+      FROM Productions p
+      JOIN ProductionCrew pc ON p.ProductionID = pc.ProductionID
+      JOIN CrewMembers c ON pc.CrewID = c.CrewID
+      WHERE c.Name = '%s'
+      ORDER BY p.EndDate ASC", 
     
     input$crew_select, 
     input$date_range[1], 
     input$date_range[2])
   
+  # runs the query
   df <-dbGetQuery(conn, query)
  
-  
+  # Creates plot using ggplot 
   p <- ggplot(df, aes(x = EndDate, y = Budget, text = Title)) +
       geom_point(color = "#007bff", size = 3) + 
       labs(title = paste("Productions for", input$crew_select), 
            x = "Completion Date", y = "Budget") +
       theme_minimal()
   
+  # Shows information on hover
   ggplotly(p, tooltip = c("text", "x", "y"))
   
 })
@@ -186,6 +213,7 @@ output$crew_plot <- renderPlotly({
 output$budget_plot <- renderPlotly({
   req(input$budget_range, input$status_filter)
   
+  #Build SQL query - counts how many crew memebers worked on each production and sprintf inserts into the query string
   query <- sprintf(
     "SELECT 
     p.Title, 
@@ -202,24 +230,30 @@ output$budget_plot <- renderPlotly({
   input$budget_range[2], 
   paste(input$status_filter, collapse = "','"))
   
-  print(query)
+# runs the query
   df <-dbGetQuery(conn, query)
-  print(head(df))
-  
 
+# Creates plot using ggplot 
     p <- ggplot(df, aes(x = CrewSize, y = Budget, colour = Status, text = Title)) +
       geom_point(size = 3, alpha = 0.7) + 
       labs(title = "Budget vs Crew Size by Status",
            x = "Crew Size", y = "Budget") +
       theme_minimal()
     
+# Shows information on hover
   ggplotly(p, tooltip = c("text", "x", "y"))
   
 })}
 
+
+
+# Launches the Shiny app
 shinyApp(ui, server)
 
+# Checks project status
 renv::status()
 
+# Disconnects from database 
 dbDisconnect(conn)
+
 ```

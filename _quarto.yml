@@ -5,10 +5,10 @@ website:
   title: "2025_DAIE_ICA_2_BF"
   navbar:
     left:
-      - href: index.qmd
-        text: "Home"
-      - href: app.qmd
-        text: "Interactive Dashbaord"
+        - text: "Home"
+          href: index.qmd
+        - text: "Interactive Dashboard"
+          href: app.html      
 
 format: 
   html:
