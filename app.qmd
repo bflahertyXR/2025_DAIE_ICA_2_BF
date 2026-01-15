@@ -68,6 +68,60 @@ ui <- fluidPage(
     heading_font = font_google("Montserrat"), 
     primary="#007bff"),
   
+  # CSS
+  tags$head(
+    tags$style(HTML("
+  
+  h2 {
+    background-color: #2c3e51;
+    padding: 20px;
+    color: white;
+    border-radius: 8px;
+  }
+  h3, h4, h5{
+    display:flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+  }
+  h5{
+    padding-top: 10px;
+    padding-bottom: 10px;
+    background-color: #2c3e52;
+    color: white;
+    border-radius: 8px;
+  }
+  .select{
+    display:flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align:center;
+  }
+  .tab-content{
+    margin-top:20px;
+  }
+  .table_style{
+    padding: 20px;
+    border: 4px solid #2c3e51;
+    border-radius: 10px;
+    margin-bottom: 20px;
+  }
+  .dataTables_scroll{
+    padding-bottom: 20px;
+    padding-top: 20px;
+  }
+  
+  .plot_style{
+    padding: 20px;
+    border: 4px solid #2c3e51;
+    border-radius: 10px;
+    margin-bottom: 20px;
+  }
+  
+  "))
+  ),
+  
   # Main title
   titlePanel("Virtual Production Dashboard"),
   
@@ -76,35 +130,42 @@ ui <- fluidPage(
     # Data View tab and custom inputs
     tabPanel("Data View",
              icon = icon("table"),
-      h4("Explore Database Tables"),
+      h3("Explore Database Tables"),
       
     # Dropdown menu with selection
+     div(
+       class = "select",
       selectInput(
           inputId = "table_select", 
           label = "Select a Table to View:",
           choices = c("Clients", "Productions", "CrewMembers", "Assets"),
-          selected = "Clients"
-          ),
-    
+          selected = "Clients",
+          )
+     ),
     # Output to table
+    div(
+      class = "table_style",
       DTOutput("table_output")
+      
+    )
       ),
   
     # Plot View tab and custom inputs
     tabPanel("Plot View",
              icon = icon("chart-line"),
-      h4("Interactive Visualisations"),
+      h3("Interactive Visualisations"),
       
+    div(
+      class = "select",
       radioButtons(
         inputId = "plot_selection",
         label = "Select Plot to View:",
         choices = c("Crew Analysis" = "crew", "Budget Analysis" = "budget"),
         selected = "crew",
         inline = TRUE
-        ),
-      
-      hr(),
-      
+        )
+      ),
+    
       conditionalPanel(
         condition = "input.plot_selection == 'crew'",
         h5("Crew Member Production Overview"),
@@ -114,7 +175,13 @@ ui <- fluidPage(
       sidebarLayout(
         sidebarPanel(
           width = 3,
-          style = "padding:20px; border-radius:10px;",
+            style = "
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 500px;
+            padding:20px; 
+            border-radius:10px;",
       
     # Dropdown menu with selections
       selectInput(
@@ -122,8 +189,7 @@ ui <- fluidPage(
         label = "Select Crew Member:",
         choices = crew_list$Name,
         selected = crew_list$Name[1]
-        ),
-      
+    ),
     # Date Range Picker
       dateRangeInput(
         inputId = "date_range",
@@ -136,7 +202,10 @@ ui <- fluidPage(
     # Output to plot in main panel section
       mainPanel(
         width = 9,
-        plotlyOutput("crew_plot", height="500px")
+        div(
+          class="plot_style",
+          plotlyOutput("crew_plot", height="500px")
+        )
       )
     )
   ),
@@ -149,7 +218,13 @@ ui <- fluidPage(
       sidebarLayout(
         sidebarPanel(
           width = 3,
-          style = "padding:20px; border-radius:10px;",
+          style = "
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 500px;
+            padding:20px; 
+            border-radius:10px;",
         
       # Slider input for Budget Range
         sliderInput(
@@ -174,7 +249,10 @@ ui <- fluidPage(
      # Output to plot in main panel section
         mainPanel(
           width = 9,
-          plotlyOutput("budget_plot", height ="500px")
+          div(
+            class="plot_style",
+            plotlyOutput("budget_plot", height ="500px")
+              )
             )
           )
         )
@@ -247,7 +325,8 @@ output$budget_plot <- renderPlotly({
     COUNT(pc.CrewID) AS CrewSize 
     FROM Productions p
     LEFT JOIN ProductionCrew pc ON p.ProductionID = pc.ProductionID 
-    WHERE p.Budget BETWEEN '%s' AND '%s' AND p.Status IN ('%s')
+    WHERE p.Budget BETWEEN '%s' AND '%s' 
+      AND p.Status IN (%s)
     GROUP BY p.Title, p.Budget, p.Status
     ORDER BY p.Budget ASC",
     input$budget_range[1], 
