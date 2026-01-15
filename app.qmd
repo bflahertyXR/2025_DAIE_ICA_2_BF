@@ -56,13 +56,16 @@ budget_info <- dbGetQuery(conn, "SELECT MIN(Budget) AS min_budget, MAX(Budget) A
 # Gets the earliest and latest dates
 date_info <- dbGetQuery(conn, "SELECT MIN(DATE(EndDate)) AS min_date, MAX(DATE(EndDate)) AS max_date FROM Productions")
 
+# Gets the status values
+status_info <- dbGetQuery(conn, "SELECT DISTINCT Status FROM Productions ORDER BY Status")
+
 # Creates and defines the aspects of the UI & # Outlines Bootstrap theme and customises
 ui <- fluidPage(
   theme = bs_theme(
     version = 5,
     bootswatch = "flatly", 
     base_font = font_google("Roboto"), 
-    heading_font = "Montserrat", 
+    heading_font = font_google("Montserrat"), 
     primary="#007bff"),
   
   # Main title
@@ -88,9 +91,24 @@ ui <- fluidPage(
       ),
   
     # Plot View tab and custom inputs
-    tabPanel("Plot View 1",
+    tabPanel("Plot View",
              icon = icon("chart-line"),
       h4("Interactive Visualisations"),
+      
+      radioButtons(
+        inputId = "plot_selection",
+        label = "Select Plot to View:",
+        choices = c("Crew Analysis" = "crew", "Budget Analysis" = "budget"),
+        selected = "crew",
+        inline = TRUE
+        ),
+      
+      hr(),
+      
+      conditionalPanel(
+        condition = "input.plot_selection == 'crew'",
+        h5("Crew Member Production Overview"),
+      
       
     # Sidebar layout and style for user controls
       sidebarLayout(
@@ -110,21 +128,22 @@ ui <- fluidPage(
       dateRangeInput(
         inputId = "date_range",
         label = "Completion Date Range:",
-        start="2023-01-01", end = Sys.Date()
+        start= date_info$min_date, 
+        end = date_info$max_date
         )
         ),
       
     # Output to plot in main panel section
       mainPanel(
         width = 9,
-        plotlyOutput("crew_plot", height="400px"),
+        plotlyOutput("crew_plot", height="500px")
       )
     )
-),
-    # Plot View tab and custom inputs 
-     tabPanel("Plot View 2",
-             icon = icon("chart-line"),
-      h4("Production Budget & Status"),
+  ),
+      
+  conditionalPanel(
+        condition = "input.plot_selection == 'budget'",
+        h5("Production Budget & Status Analysis"),
       
     # Sidebar layout and style for user controls
       sidebarLayout(
@@ -136,8 +155,9 @@ ui <- fluidPage(
         sliderInput(
           inputId = "budget_range",
           label = "Budget Range:",
-          min = 0, max = 1000000,
-          value = c(0, 1000000),
+          min = budget_info$min_budget,
+          max = budget_info$max_budget,
+          value = c(budget_info$min_budget, budget_info$max_budget),
           step = 10000,
         ),
       
@@ -145,9 +165,9 @@ ui <- fluidPage(
         checkboxGroupInput(
           inputId = "status_filter", 
           label = "Production Status:",
-          choices = c("Completed", "In-Progress"),
-          selected = c("Completed", "In-Progress"),
-          inline = TRUE
+          choices = status_info$Status,
+          selected = status_info$Status,
+          inline = FALSE
           )
         ),
         
@@ -155,11 +175,12 @@ ui <- fluidPage(
         mainPanel(
           width = 9,
           plotlyOutput("budget_plot", height ="500px")
+            )
           )
         )
-     )
+      )
+    )
   )
-)
 
 # Interactive outputs and inputs changes
 server <- function(input, output, session){
@@ -177,21 +198,22 @@ server <- function(input, output, session){
 output$crew_plot <- renderPlotly({
   req(input$crew_select, input$date_range)
   
-  #Build SQL query - this joins 3 tables and sprintf inserts into the query string
+  #Build SQL query - this joins the tables and sprintf inserts into the query string
   query <- sprintf(
     "SELECT 
+      c.Name AS CrewName,
       p.Title, 
       p.EndDate, 
-      p.Budget
+      p.Budget,
+      p.Status
       FROM Productions p
       JOIN ProductionCrew pc ON p.ProductionID = pc.ProductionID
       JOIN CrewMembers c ON pc.CrewID = c.CrewID
-      WHERE c.Name = '%s'
+      WHERE c.Name = '%s' AND DATE(p.EndDate) BETWEEN '%s' AND '%s'
       ORDER BY p.EndDate ASC", 
-    
-    input$crew_select, 
-    input$date_range[1], 
-    input$date_range[2])
+      input$crew_select, 
+      input$date_range[1], 
+      input$date_range[2])
   
   # runs the query
   df <-dbGetQuery(conn, query)
@@ -213,6 +235,9 @@ output$crew_plot <- renderPlotly({
 output$budget_plot <- renderPlotly({
   req(input$budget_range, input$status_filter)
   
+  #Build Status list for query
+  status_list <- paste0("'", input$status_filter, "'", collapse = ", ")
+  
   #Build SQL query - counts how many crew memebers worked on each production and sprintf inserts into the query string
   query <- sprintf(
     "SELECT 
@@ -222,13 +247,13 @@ output$budget_plot <- renderPlotly({
     COUNT(pc.CrewID) AS CrewSize 
     FROM Productions p
     LEFT JOIN ProductionCrew pc ON p.ProductionID = pc.ProductionID 
-    WHERE p.Budget BETWEEN 0 AND 999999999 AND p.Status IN ('Completed', 'In Progress')
+    WHERE p.Budget BETWEEN '%s' AND '%s' AND p.Status IN ('%s')
     GROUP BY p.Title, p.Budget, p.Status
     ORDER BY p.Budget ASC",
-    
-  input$budget_range[1], 
-  input$budget_range[2], 
-  paste(input$status_filter, collapse = "','"))
+    input$budget_range[1], 
+    input$budget_range[2], 
+    status_list
+  )
   
 # runs the query
   df <-dbGetQuery(conn, query)
